@@ -1,7 +1,6 @@
 const canvas = document.getElementById("gameCanvas");
 const context = canvas.getContext("2d");
 const startButton = document.getElementById("startButton");
-const restartButton = document.getElementById("restartButton");
 
 const launcherX = canvas.width / 2;
 const launcherY = canvas.height - 110;
@@ -32,6 +31,11 @@ let targetMinX = 0;
 let targetMaxX = 0;
 let targetMinY = 0;
 let targetMaxY = 0;
+let levelGallons = 0;
+let totalGallons = 0;
+let currentGoalGallons = 50;
+let currentSplashMaxRadius = 40;
+let currentSplashGrowthRate = 130;
 let baseRotationSpeed = 1.5;
 let basePowerSpeed = 0.9;
 let speedVariancePercentMin = 0.05;
@@ -66,6 +70,8 @@ let splash = {
   radius: 0,
   maxRadius: 40,
   growthRate: 130,
+  hasScored: false,
+  gallonsAwarded: 0,
 };
 
 let inputPhase = "aim";
@@ -85,6 +91,12 @@ const impactMessages = {
   1: "You helped a family get clean water today.",
   2: "You helped a whole town access clean water.",
   3: "Your action supports clean water for entire regions.",
+};
+
+const levelGoalGallons = {
+  1: 50,
+  2: 500,
+  3: 5000000,
 };
 
 function createTargetImage(relativePath) {
@@ -194,6 +206,8 @@ function resetAttemptState() {
   droplet.isActive = false;
   splash.isActive = false;
   splash.radius = 0;
+  splash.hasScored = false;
+  splash.gallonsAwarded = 0;
   isGameWon = false;
   impactText.isActive = false;
   queuedLevel = null;
@@ -201,7 +215,6 @@ function resetAttemptState() {
   transitionTimer = 0;
 
   startButton.classList.remove("is-hidden");
-  restartButton.classList.add("is-hidden");
 
   applyAttemptVariance();
 }
@@ -213,8 +226,14 @@ function showWinScreen() {
   isPowerLocked = true;
   droplet.isActive = false;
 
-  startButton.classList.add("is-hidden");
-  restartButton.classList.remove("is-hidden");
+  startButton.classList.remove("is-hidden");
+}
+
+function resetToLevelOne() {
+  currentLevel = 1;
+  totalGallons = 0;
+  loadLevel(1);
+  resetAttemptState();
 }
 
 function getCameraScale() {
@@ -362,7 +381,9 @@ function applyAttemptVariance() {
 
   setRotationSpeed(variedRotationSpeed);
   setPowerSpeed(variedPowerSpeed);
+}
 
+function randomizeTargetPosition() {
   const labelBottomPadding = 84;
   const safeMaxY = Math.max(targetMinY, Math.min(targetMaxY, canvas.height - targetArea.height - labelBottomPadding));
 
@@ -377,17 +398,21 @@ function loadLevel(levelNumber) {
 
   targetImage = levelTargetImages[levelNumber] || null;
   targetLabelLines = levelTargetLabels[levelNumber] || [];
+  currentGoalGallons = levelGoalGallons[levelNumber] || 50;
+  levelGallons = 0;
 
   if (levelNumber === 1) {
     // Level 1: close/easy setup with smaller single-house target and forgiving timing.
-    cameraZoom = 1.25;
+    cameraZoom = 1;
     targetIconStyle = "bucket";
-    targetArea.width = 92;
-    targetArea.height = 92;
+    targetArea.width = 48;
+    targetArea.height = 48;
     baseTargetX = canvas.width * 0.62;
     baseTargetY = canvas.height * 0.43;
     targetShiftRange = 3;
-    setTargetRandomBounds(canvas.width * 0.10, canvas.width * 0.88, canvas.height * 0.10, canvas.height * 0.62);
+    setTargetRandomBounds(canvas.width * 0.28, canvas.width * 0.72, canvas.height * 0.14, canvas.height * 0.50);
+    currentSplashMaxRadius = 55;
+    currentSplashGrowthRate = 165;
 
     perfectZoneSize = 0.28;
     perfectZoneStart = 0.58;
@@ -401,14 +426,16 @@ function loadLevel(levelNumber) {
 
   if (levelNumber === 2) {
     // Level 2: medium setup with slightly larger town target and subtle variance.
-    cameraZoom = 1.08;
+    cameraZoom = 1;
     targetIconStyle = "town";
-    targetArea.width = 120;
-    targetArea.height = 84;
+    targetArea.width = 72;
+    targetArea.height = 50;
     baseTargetX = canvas.width * 0.67;
     baseTargetY = canvas.height * 0.30;
     targetShiftRange = 10;
-    setTargetRandomBounds(canvas.width * 0.08, canvas.width * 0.88, canvas.height * 0.08, canvas.height * 0.56);
+    setTargetRandomBounds(canvas.width * 0.22, canvas.width * 0.78, canvas.height * 0.10, canvas.height * 0.48);
+    currentSplashMaxRadius = 95;
+    currentSplashGrowthRate = 210;
 
     perfectZoneSize = 0.18;
     perfectZoneStart = 0.64;
@@ -422,14 +449,16 @@ function loadLevel(levelNumber) {
 
   if (levelNumber === 3) {
     // Level 3: larger world target at top-center with fast timing and tight windows.
-    cameraZoom = 0.82;
+    cameraZoom = 1;
     targetIconStyle = "globe";
-    targetArea.width = 255;
-    targetArea.height = 178;
+    targetArea.width = 520;
+    targetArea.height = 300;
     baseTargetX = canvas.width / 2 - targetArea.width / 2;
-    baseTargetY = canvas.height * 0.12;
+    baseTargetY = canvas.height * 0.03;
     targetShiftRange = 0;
-    setTargetRandomBounds(canvas.width * 0.05, canvas.width * 0.95, canvas.height * 0.05, canvas.height * 0.44);
+    setTargetRandomBounds(baseTargetX, baseTargetX, baseTargetY, baseTargetY);
+    currentSplashMaxRadius = 520;
+    currentSplashGrowthRate = 560;
 
     perfectZoneSize = 0.09;
     perfectZoneStart = 0.71;
@@ -442,6 +471,7 @@ function loadLevel(levelNumber) {
   }
 
   applyAttemptVariance();
+  randomizeTargetPosition();
 }
 
 function throwWater(angle, power) {
@@ -467,6 +497,77 @@ function startSplash(x, y) {
   splash.x = x;
   splash.y = y;
   splash.radius = 4;
+  splash.maxRadius = currentSplashMaxRadius;
+  splash.growthRate = currentSplashGrowthRate;
+  splash.hasScored = false;
+  splash.gallonsAwarded = 0;
+}
+
+function calculateTargetPixelsInsideCircle(circleX, circleY, radius) {
+  const rectLeft = targetArea.x;
+  const rectTop = targetArea.y;
+  const rectRight = targetArea.x + targetArea.width;
+  const rectBottom = targetArea.y + targetArea.height;
+
+  const minX = Math.max(Math.ceil(rectLeft), Math.ceil(circleX - radius));
+  const maxX = Math.min(Math.floor(rectRight - 1), Math.floor(circleX + radius));
+  const minY = Math.max(Math.ceil(rectTop), Math.ceil(circleY - radius));
+  const maxY = Math.min(Math.floor(rectBottom - 1), Math.floor(circleY + radius));
+
+  if (minX > maxX || minY > maxY) {
+    return 0;
+  }
+
+  const radiusSquared = radius * radius;
+  let pixelsInside = 0;
+
+  for (let y = minY; y <= maxY; y += 1) {
+    const yFromCenter = y + 0.5 - circleY;
+    const horizontalSquared = radiusSquared - yFromCenter * yFromCenter;
+
+    if (horizontalSquared <= 0) {
+      continue;
+    }
+
+    const horizontalReach = Math.sqrt(horizontalSquared);
+    const rowMinX = Math.max(minX, Math.ceil(circleX - horizontalReach));
+    const rowMaxX = Math.min(maxX, Math.floor(circleX + horizontalReach));
+
+    if (rowMaxX >= rowMinX) {
+      pixelsInside += rowMaxX - rowMinX + 1;
+    }
+  }
+
+  return pixelsInside;
+}
+
+function processSplashScore() {
+  if (!splash.isActive || splash.hasScored) {
+    return;
+  }
+
+  const gallonsFromThisHit = calculateTargetPixelsInsideCircle(
+    splash.x,
+    splash.y,
+    splash.maxRadius
+  );
+
+  splash.gallonsAwarded = gallonsFromThisHit;
+  splash.hasScored = true;
+  levelGallons += gallonsFromThisHit;
+  totalGallons += gallonsFromThisHit;
+
+  if (levelGallons < currentGoalGallons) {
+    return;
+  }
+
+  startImpactText(currentLevel);
+
+  if (currentLevel < maxLevel) {
+    startLevelTransition(currentLevel + 1);
+  } else {
+    showWinScreen();
+  }
 }
 
 function drawBackground() {
@@ -705,6 +806,39 @@ function drawPowerBar() {
   context.strokeRect(powerBarX, powerBarY, powerBarWidth, powerBarHeight);
 }
 
+function drawScoreHud() {
+  const hudX = 18;
+  const hudY = 14;
+  const hudWidth = 340;
+  const hudHeight = 88;
+
+  context.save();
+  context.fillStyle = "rgba(9, 32, 48, 0.78)";
+  context.fillRect(hudX, hudY, hudWidth, hudHeight);
+
+  context.strokeStyle = "rgba(255, 255, 255, 0.35)";
+  context.lineWidth = 1.5;
+  context.strokeRect(hudX, hudY, hudWidth, hudHeight);
+
+  context.fillStyle = "#ffffff";
+  context.textAlign = "left";
+  context.textBaseline = "middle";
+  context.font = '600 16px "Segoe UI", Tahoma, sans-serif';
+  context.fillText(`Level ${currentLevel} Goal: ${currentGoalGallons.toLocaleString()} gal`, hudX + 12, hudY + 24);
+
+  context.font = '700 20px "Segoe UI", Tahoma, sans-serif';
+  const progressGallons = Math.min(levelGallons, currentGoalGallons);
+  context.fillText(
+    `Level Water: ${progressGallons.toLocaleString()} / ${currentGoalGallons.toLocaleString()} gal`,
+    hudX + 12,
+    hudY + 50
+  );
+
+  context.font = '500 14px "Segoe UI", Tahoma, sans-serif';
+  context.fillText(`Total Water: ${totalGallons.toLocaleString()} gal`, hudX + 12, hudY + 72);
+  context.restore();
+}
+
 function drawDroplet() {
   if (!droplet.isActive) {
     return;
@@ -786,14 +920,6 @@ function updateDroplet(deltaTimeInSeconds) {
   if (isInsideTargetArea(droplet.x, droplet.y)) {
     droplet.isActive = false;
     startSplash(droplet.x, droplet.y);
-    startImpactText(currentLevel);
-
-    if (currentLevel < maxLevel) {
-      startLevelTransition(currentLevel + 1);
-    } else {
-      showWinScreen();
-    }
-
     return;
   }
 
@@ -816,6 +942,7 @@ function updateSplash(deltaTimeInSeconds) {
   splash.radius += splash.growthRate * deltaTimeInSeconds;
 
   if (splash.radius >= splash.maxRadius) {
+    processSplashScore();
     splash.isActive = false;
     splash.radius = 0;
   }
@@ -847,6 +974,7 @@ function gameLoop(timestamp) {
   context.restore();
 
   drawPowerBar();
+  drawScoreHud();
   drawImpactText();
   drawWinScreen();
 
@@ -854,19 +982,12 @@ function gameLoop(timestamp) {
 }
 
 startButton.addEventListener("click", () => {
-  if (isLevelTransitioning || isGameWon) {
+  if (isLevelTransitioning) {
     return;
   }
 
-  resetAttemptState();
+  resetToLevelOne();
 });
-
-restartButton.addEventListener("click", () => {
-  currentLevel = 1;
-  loadLevel(1);
-  resetAttemptState();
-});
-
 window.addEventListener("keydown", (event) => {
   if (isGameWon || isLevelTransitioning) {
     return;
@@ -885,6 +1006,16 @@ window.addEventListener("keydown", (event) => {
       lockPower();
       inputPhase = "thrown";
       throwWater(arrowAngle, powerValue);
+      return;
+    }
+
+    if (
+      inputPhase === "thrown" &&
+      !droplet.isActive &&
+      !splash.isActive &&
+      !impactText.isActive
+    ) {
+      resetAttemptState();
     }
   }
 });
