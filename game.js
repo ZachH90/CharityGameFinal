@@ -135,6 +135,23 @@ let missText = {
   message: "We need to get water to these people! Try again",
 };
 
+const confettiColors = ["#ffd44d", "#2a7db9", "#5ec576", "#f26a5a", "#ffffff"];
+let confettiParticles = [];
+
+let winPanelBounds = {
+  x: 0,
+  y: 0,
+  width: 0,
+  height: 0,
+};
+
+let winLinkBounds = {
+  x: 0,
+  y: 0,
+  width: 0,
+  height: 0,
+};
+
 function drawImageContain(image, boxX, boxY, boxWidth, boxHeight) {
   const imageWidth = image.naturalWidth;
   const imageHeight = image.naturalHeight;
@@ -278,6 +295,7 @@ function startImpactText(levelNumber) {
   impactText.duration =
     impactText.fadeInDuration + impactText.holdDuration + impactText.fadeOutDuration;
   impactText.message = impactMessages[levelNumber] || "";
+  spawnConfetti(64);
 }
 
 function startMissText() {
@@ -309,6 +327,64 @@ function updateMissText(deltaTimeInSeconds) {
     missText.isActive = false;
     missText.timer = 0;
   }
+}
+
+function spawnConfetti(count) {
+  for (let index = 0; index < count; index += 1) {
+    confettiParticles.push({
+      x: canvas.width / 2 + randomRange(-180, 180),
+      y: randomRange(24, 84),
+      vx: randomRange(-170, 170),
+      vy: randomRange(-260, -80),
+      size: randomRange(4, 8),
+      color: confettiColors[Math.floor(randomRange(0, confettiColors.length))],
+      rotation: randomRange(0, Math.PI * 2),
+      rotationSpeed: randomRange(-7, 7),
+      life: randomRange(1.6, 2.6),
+      maxLife: 2.6,
+    });
+  }
+}
+
+function updateConfetti(deltaTimeInSeconds) {
+  if (!confettiParticles.length) {
+    return;
+  }
+
+  const confettiGravity = 540;
+  for (let index = confettiParticles.length - 1; index >= 0; index -= 1) {
+    const particle = confettiParticles[index];
+    particle.vy += confettiGravity * deltaTimeInSeconds;
+    particle.x += particle.vx * deltaTimeInSeconds;
+    particle.y += particle.vy * deltaTimeInSeconds;
+    particle.rotation += particle.rotationSpeed * deltaTimeInSeconds;
+    particle.life -= deltaTimeInSeconds;
+
+    if (particle.life <= 0 || particle.y > canvas.height + 20) {
+      confettiParticles.splice(index, 1);
+    }
+  }
+}
+
+function drawConfetti() {
+  if (!confettiParticles.length) {
+    return;
+  }
+
+  context.save();
+  for (let index = 0; index < confettiParticles.length; index += 1) {
+    const particle = confettiParticles[index];
+    const alpha = clamp(particle.life / particle.maxLife, 0, 1);
+
+    context.save();
+    context.globalAlpha = alpha;
+    context.translate(particle.x, particle.y);
+    context.rotate(particle.rotation);
+    context.fillStyle = particle.color;
+    context.fillRect(-particle.size / 2, -particle.size / 2, particle.size, particle.size);
+    context.restore();
+  }
+  context.restore();
 }
 
 function drawImpactText() {
@@ -387,6 +463,8 @@ function drawMissText() {
 
 function drawWinScreen() {
   if (!isGameWon) {
+    winPanelBounds.width = 0;
+    winLinkBounds.width = 0;
     return;
   }
 
@@ -394,10 +472,16 @@ function drawWinScreen() {
   context.fillStyle = "rgba(7, 29, 44, 0.64)";
   context.fillRect(0, 0, canvas.width, canvas.height);
 
-  const panelWidth = 520;
-  const panelHeight = 170;
+  const panelWidth = 620;
+  const panelHeight = 250;
   const panelX = (canvas.width - panelWidth) / 2;
   const panelY = (canvas.height - panelHeight) / 2;
+  const panelCenterX = canvas.width / 2;
+
+  winPanelBounds.x = panelX;
+  winPanelBounds.y = panelY;
+  winPanelBounds.width = panelWidth;
+  winPanelBounds.height = panelHeight;
 
   context.fillStyle = "#ffffff";
   context.fillRect(panelX, panelY, panelWidth, panelHeight);
@@ -409,12 +493,69 @@ function drawWinScreen() {
   context.textBaseline = "middle";
   context.fillStyle = "#103a54";
   context.font = '700 38px "Segoe UI", Tahoma, sans-serif';
-  context.fillText("You made a global impact!", canvas.width / 2, panelY + 68);
+  context.fillText("You made a global impact!", panelCenterX, panelY + 62);
 
   context.fillStyle = "#29566f";
-  context.font = '500 21px "Segoe UI", Tahoma, sans-serif';
-  context.fillText("Press Restart to play from Level 1.", canvas.width / 2, panelY + 116);
+  context.font = '600 22px "Segoe UI", Tahoma, sans-serif';
+  context.fillText("Its not an easy task getting water to the world", panelCenterX, panelY + 110);
+  context.fillText("we need your help", panelCenterX, panelY + 140);
+
+  const linkText = "find out how you can help";
+  context.font = '700 20px "Segoe UI", Tahoma, sans-serif';
+  context.fillStyle = "#0b66a1";
+  const linkTextWidth = context.measureText(linkText).width;
+  const linkY = panelY + panelHeight - 38;
+  context.fillText(linkText, panelCenterX, linkY);
+
+  context.lineWidth = 2;
+  context.strokeStyle = "#0b66a1";
+  context.beginPath();
+  context.moveTo(panelCenterX - linkTextWidth / 2, linkY + 12);
+  context.lineTo(panelCenterX + linkTextWidth / 2, linkY + 12);
+  context.stroke();
+
+  winLinkBounds.x = panelCenterX - linkTextWidth / 2 - 8;
+  winLinkBounds.y = linkY - 16;
+  winLinkBounds.width = linkTextWidth + 16;
+  winLinkBounds.height = 32;
+
+  context.fillStyle = "#4a6b80";
+  context.font = '500 14px "Segoe UI", Tahoma, sans-serif';
+  context.fillText("Click outside this box to keep playing", panelCenterX, panelY + panelHeight - 14);
   context.restore();
+}
+
+function getCanvasPointerPosition(event) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+
+  return {
+    x: (event.clientX - rect.left) * scaleX,
+    y: (event.clientY - rect.top) * scaleY,
+  };
+}
+
+function pointInRect(pointX, pointY, rect) {
+  return (
+    pointX >= rect.x &&
+    pointX <= rect.x + rect.width &&
+    pointY >= rect.y &&
+    pointY <= rect.y + rect.height
+  );
+}
+
+function handleWinOverlayPointer(event) {
+  const pointer = getCanvasPointerPosition(event);
+
+  if (pointInRect(pointer.x, pointer.y, winLinkBounds)) {
+    window.open("https://www.charitywater.org/", "_blank", "noopener,noreferrer");
+    return;
+  }
+
+  if (!pointInRect(pointer.x, pointer.y, winPanelBounds)) {
+    resetAttemptState();
+  }
 }
 
 function updateLevelTransition(deltaTimeInSeconds) {
@@ -1031,6 +1172,7 @@ function gameLoop(timestamp) {
   updateLevelTransition(deltaTimeInSeconds);
   updateImpactText(deltaTimeInSeconds);
   updateMissText(deltaTimeInSeconds);
+  updateConfetti(deltaTimeInSeconds);
   updateArrow(deltaTimeInSeconds);
   updatePower(deltaTimeInSeconds);
   updateDroplet(deltaTimeInSeconds);
@@ -1052,6 +1194,7 @@ function gameLoop(timestamp) {
 
   drawPowerBar();
   drawScoreHud();
+  drawConfetti();
   drawImpactText();
   drawMissText();
   drawWinScreen();
@@ -1104,6 +1247,12 @@ window.addEventListener("keydown", (event) => {
 });
 
 canvas.addEventListener("pointerdown", (event) => {
+  if (isGameWon) {
+    event.preventDefault();
+    handleWinOverlayPointer(event);
+    return;
+  }
+
   if (!mobileViewportQuery.matches) {
     return;
   }
