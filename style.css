@@ -44,8 +44,7 @@ body {
   display: block;
 }
 
-#startButton,
-#restartButton {
+#startButton {
   padding: 0.6rem 1rem;
   border: 0;
   border-radius: 8px;
@@ -55,11 +54,38 @@ body {
   cursor: pointer;
 }
 
-#startButton:hover,
-#restartButton:hover {
+#startButton:hover {
   background: #216798;
 }
 
 .is-hidden {
   display: none;
+}
+
+@media (max-width: 768px) {
+  body {
+    padding: 0.5rem;
+    place-items: start center;
+  }
+
+  .game-shell {
+    width: 100%;
+    gap: 0.6rem;
+  }
+
+  #gameCanvas {
+    width: 100%;
+    border-radius: 8px;
+    touch-action: manipulation;
+  }
+
+  .controls {
+    width: 100%;
+  }
+
+  #startButton {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+  }
 }

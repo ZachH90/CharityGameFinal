@@ -1,6 +1,7 @@
 const canvas = document.getElementById("gameCanvas");
 const context = canvas.getContext("2d");
 const startButton = document.getElementById("startButton");
+const mobileViewportQuery = window.matchMedia("(max-width: 768px)");
 
 const launcherX = canvas.width / 2;
 const launcherY = canvas.height - 110;
@@ -988,36 +989,49 @@ startButton.addEventListener("click", () => {
 
   resetToLevelOne();
 });
-window.addEventListener("keydown", (event) => {
+
+function handlePrimaryAction() {
   if (isGameWon || isLevelTransitioning) {
     return;
   }
 
+  if (inputPhase === "aim") {
+    lockAngle();
+    inputPhase = "power";
+    return;
+  }
+
+  if (inputPhase === "power") {
+    lockPower();
+    inputPhase = "thrown";
+    throwWater(arrowAngle, powerValue);
+    return;
+  }
+
+  if (
+    inputPhase === "thrown" &&
+    !droplet.isActive &&
+    !splash.isActive &&
+    !impactText.isActive
+  ) {
+    resetAttemptState();
+  }
+}
+
+window.addEventListener("keydown", (event) => {
   if (event.code === "Space") {
     event.preventDefault();
-
-    if (inputPhase === "aim") {
-      lockAngle();
-      inputPhase = "power";
-      return;
-    }
-
-    if (inputPhase === "power") {
-      lockPower();
-      inputPhase = "thrown";
-      throwWater(arrowAngle, powerValue);
-      return;
-    }
-
-    if (
-      inputPhase === "thrown" &&
-      !droplet.isActive &&
-      !splash.isActive &&
-      !impactText.isActive
-    ) {
-      resetAttemptState();
-    }
+    handlePrimaryAction();
   }
+});
+
+canvas.addEventListener("pointerdown", (event) => {
+  if (!mobileViewportQuery.matches) {
+    return;
+  }
+
+  event.preventDefault();
+  handlePrimaryAction();
 });
 
 loadLevel(1);
