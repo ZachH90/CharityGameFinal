@@ -121,8 +121,18 @@ const levelTargetLabels = {
 let impactText = {
   isActive: false,
   timer: 0,
-  duration: 4,
+  fadeInDuration: 0.5,
+  holdDuration: 4,
+  fadeOutDuration: 0.5,
+  duration: 5,
   message: "",
+};
+
+let missText = {
+  isActive: false,
+  timer: 0,
+  duration: 2.4,
+  message: "We need to get water to these people! Try again",
 };
 
 function drawImageContain(image, boxX, boxY, boxWidth, boxHeight) {
@@ -211,6 +221,8 @@ function resetAttemptState() {
   splash.gallonsAwarded = 0;
   isGameWon = false;
   impactText.isActive = false;
+  missText.isActive = false;
+  missText.timer = 0;
   queuedLevel = null;
   isLevelTransitioning = false;
   transitionTimer = 0;
@@ -263,7 +275,14 @@ function startLevelTransition(nextLevel) {
 function startImpactText(levelNumber) {
   impactText.isActive = true;
   impactText.timer = 0;
+  impactText.duration =
+    impactText.fadeInDuration + impactText.holdDuration + impactText.fadeOutDuration;
   impactText.message = impactMessages[levelNumber] || "";
+}
+
+function startMissText() {
+  missText.isActive = true;
+  missText.timer = 0;
 }
 
 function updateImpactText(deltaTimeInSeconds) {
@@ -279,13 +298,36 @@ function updateImpactText(deltaTimeInSeconds) {
   }
 }
 
+function updateMissText(deltaTimeInSeconds) {
+  if (!missText.isActive) {
+    return;
+  }
+
+  missText.timer += deltaTimeInSeconds;
+
+  if (missText.timer >= missText.duration) {
+    missText.isActive = false;
+    missText.timer = 0;
+  }
+}
+
 function drawImpactText() {
   if (!impactText.isActive || !impactText.message) {
     return;
   }
 
-  const normalized = clamp(impactText.timer / impactText.duration, 0, 1);
-  const alpha = normalized < 0.5 ? normalized * 2 : (1 - normalized) * 2;
+  const fadeInEnd = impactText.fadeInDuration;
+  const holdEnd = fadeInEnd + impactText.holdDuration;
+  const fadeOutEnd = holdEnd + impactText.fadeOutDuration;
+
+  let alpha = 1;
+  if (impactText.timer < fadeInEnd) {
+    alpha = impactText.timer / Math.max(impactText.fadeInDuration, 0.001);
+  } else if (impactText.timer > holdEnd) {
+    alpha = 1 - (impactText.timer - holdEnd) / Math.max(impactText.fadeOutDuration, 0.001);
+  }
+
+  alpha = clamp(alpha, 0, 1);
   const textX = canvas.width / 2;
   const textY = 58;
 
@@ -308,6 +350,38 @@ function drawImpactText() {
 
   context.fillStyle = "#ffffff";
   context.fillText(impactText.message, textX, textY);
+  context.restore();
+}
+
+function drawMissText() {
+  if (!missText.isActive || !missText.message) {
+    return;
+  }
+
+  const normalized = clamp(missText.timer / missText.duration, 0, 1);
+  const alpha = normalized < 0.4 ? normalized / 0.4 : (1 - normalized) / 0.6;
+  const textX = canvas.width / 2;
+  const textY = 92;
+
+  context.save();
+  context.globalAlpha = clamp(alpha, 0, 1);
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.font = '700 20px "Segoe UI", Tahoma, sans-serif';
+
+  const textWidth = context.measureText(missText.message).width;
+  const paddingX = 14;
+  const paddingY = 8;
+  context.fillStyle = "rgba(103, 27, 27, 0.68)";
+  context.fillRect(
+    textX - textWidth / 2 - paddingX,
+    textY - 10 - paddingY,
+    textWidth + paddingX * 2,
+    20 + paddingY * 2
+  );
+
+  context.fillStyle = "#ffffff";
+  context.fillText(missText.message, textX, textY);
   context.restore();
 }
 
@@ -932,6 +1006,7 @@ function updateDroplet(deltaTimeInSeconds) {
 
   if (isOutOfBounds) {
     droplet.isActive = false;
+    startMissText();
   }
 }
 
@@ -955,6 +1030,7 @@ function gameLoop(timestamp) {
 
   updateLevelTransition(deltaTimeInSeconds);
   updateImpactText(deltaTimeInSeconds);
+  updateMissText(deltaTimeInSeconds);
   updateArrow(deltaTimeInSeconds);
   updatePower(deltaTimeInSeconds);
   updateDroplet(deltaTimeInSeconds);
@@ -977,6 +1053,7 @@ function gameLoop(timestamp) {
   drawPowerBar();
   drawScoreHud();
   drawImpactText();
+  drawMissText();
   drawWinScreen();
 
   requestAnimationFrame(gameLoop);
@@ -1012,7 +1089,8 @@ function handlePrimaryAction() {
     inputPhase === "thrown" &&
     !droplet.isActive &&
     !splash.isActive &&
-    !impactText.isActive
+    !impactText.isActive &&
+    !missText.isActive
   ) {
     resetAttemptState();
   }
