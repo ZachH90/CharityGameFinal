@@ -22,6 +22,7 @@
       <div class="story-content">
         <h1 id="storyTitle" class="story-title"></h1>
         <div id="storyText" class="story-text"></div>
+        <p id="storyInstruction" class="story-instruction is-hidden"></p>
         <button id="storyStartButton" type="button" class="story-button">Start Level 1</button>
       </div>
     </div>
@@ -51,6 +52,15 @@
         <canvas id="gameCanvas" width="960" height="540" aria-label="Game canvas"></canvas>
         <div class="controls">
           <button id="startButton" type="button">Reset To Level 1</button>
+          <button id="audioToggleButton" type="button" aria-pressed="false">Sound: On</button>
+          <label class="audio-control" for="musicVolumeSlider">
+            Music
+            <input id="musicVolumeSlider" type="range" min="0" max="100" value="24" step="1">
+          </label>
+          <label class="audio-control" for="sfxVolumeSlider">
+            SFX
+            <input id="sfxVolumeSlider" type="range" min="0" max="100" value="85" step="1">
+          </label>
         </div>
       </div>
     </main>

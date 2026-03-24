@@ -31,7 +31,9 @@ body {
 .controls {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.6rem;
+  justify-content: center;
 }
 
 #gameCanvas {
@@ -56,6 +58,37 @@ body {
 
 #startButton:hover {
   background: #216798;
+}
+
+#audioToggleButton {
+  padding: 0.6rem 0.9rem;
+  border: 0;
+  border-radius: 8px;
+  background: #245975;
+  color: #ffffff;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+#audioToggleButton:hover {
+  background: #1d4a61;
+}
+
+.audio-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1b3f56;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(27, 63, 86, 0.2);
+  border-radius: 8px;
+  padding: 0.4rem 0.55rem;
+}
+
+.audio-control input[type="range"] {
+  width: 110px;
 }
 
 .is-hidden {
@@ -182,6 +215,14 @@ body {
   margin-bottom: 0;
 }
 
+.story-instruction {
+  color: #1f4058;
+  font-size: 1rem;
+  font-weight: 600;
+  text-align: center;
+  margin: 0 0 1.25rem 0;
+}
+
 .story-button {
   padding: 1rem 2rem;
   border: 0;
@@ -238,6 +279,21 @@ body {
     width: 100%;
     padding: 0.75rem 1rem;
     font-size: 1rem;
+  }
+
+  #audioToggleButton {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+  }
+
+  .audio-control {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .audio-control input[type="range"] {
+    width: 62%;
   }
 
   /* Mobile splash screen adjustments */

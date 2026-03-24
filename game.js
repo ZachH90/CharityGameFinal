@@ -1,6 +1,9 @@
 const canvas = document.getElementById("gameCanvas");
 const context = canvas.getContext("2d");
 const startButton = document.getElementById("startButton");
+const audioToggleButton = document.getElementById("audioToggleButton");
+const musicVolumeSlider = document.getElementById("musicVolumeSlider");
+const sfxVolumeSlider = document.getElementById("sfxVolumeSlider");
 const mobileViewportQuery = window.matchMedia("(max-width: 768px)");
 
 // Screen management
@@ -11,7 +14,11 @@ const gameScreen = document.getElementById("gameScreen");
 const logoArea = document.getElementById("logoArea");
 const storyTitle = document.getElementById("storyTitle");
 const storyText = document.getElementById("storyText");
+const storyInstruction = document.getElementById("storyInstruction");
 const storyStartButton = document.getElementById("storyStartButton");
+const levelCompleteTitle = document.getElementById("levelCompleteTitle");
+const levelCompleteText = document.getElementById("levelCompleteText");
+const levelCompleteImage = document.getElementById("levelCompleteImage");
 const level2StartButton = document.getElementById("level2StartButton");
 
 // Debug: Check if elements are found
@@ -47,6 +54,49 @@ const storyContent = {
   }
 };
 
+const levelEndingContent = {
+  1: {
+    title: "A Healthier Future Begins",
+    body: `<p>Families now have clean water close to home instead of climbing long distances to unsafe sources.</p>
+    <p>With safe water access, community health improved dramatically. The local clinic dropped from around 700 patients per month to about 60-65, and reported diarrhea cases fell from more than 6,000 per year to under 200.</p>
+    <p>Students now dream bigger: becoming scientists, doctors, engineers, teachers, and social workers to build a stronger future for their families and community.</p>`,
+    imageSrc: "img/watertibet.png",
+    imageAlt: "Students and community with improved water access",
+    buttonText: "Start Level 2",
+    nextLevel: 2,
+  },
+  2: {
+    title: "Together, We Can Transform Mali",
+    body: `<p>Because of your support, 20,000 people in rural Mali experienced a different path through 2020.</p>
+    <p>Your continued action can transform the future for families who've endured life without clean water for far too long.</p>`,
+    imageSrc: "img/maliwater.jpeg",
+    imageAlt: "Rural Mali community with improved water access",
+    buttonText: "Start Level 3",
+    nextLevel: 3,
+  },
+};
+
+let currentEndingLevel = 1;
+
+function getStoryInstructionText() {
+  if (mobileViewportQuery.matches) {
+    return "Tap to stop the arrow and power meter to properly direct the water to the community.";
+  }
+
+  return "Use the space bar to stop the arrow and power meter to properly direct the water to the community.";
+}
+
+function updateStoryInstruction() {
+  if (currentLevel === 1 || currentLevel === 2) {
+    storyInstruction.textContent = getStoryInstructionText();
+    storyInstruction.classList.remove("is-hidden");
+    return;
+  }
+
+  storyInstruction.classList.add("is-hidden");
+  storyInstruction.textContent = "";
+}
+
 // Screen transition functions
 function showScreen(screenName) {
   splashScreen.classList.add("is-hidden");
@@ -71,6 +121,8 @@ function showScreen(screenName) {
     gameFlowState = "playing";
     console.log("✓ Game screen shown");
   }
+
+  syncMusicForScreen();
 }
 
 function transitionToStory() {
@@ -78,6 +130,9 @@ function transitionToStory() {
   if (story) {
     storyTitle.textContent = story.title;
     storyText.innerHTML = story.body;
+
+    updateStoryInstruction();
+
     storyStartButton.textContent = `Start Level ${currentLevel}`;
     showScreen("story");
   }
@@ -89,12 +144,29 @@ function transitionToGame() {
   resetAttemptState();
 }
 
-function transitionToLevel2FromEnding() {
-  currentLevel = 2;
+function transitionToNextLevelFromEnding() {
+  const ending = levelEndingContent[currentEndingLevel];
+  if (!ending) {
+    return;
+  }
+
+  currentLevel = ending.nextLevel;
   transitionToStory();
 }
 
-function showLevelOneEndingScreen() {
+function showLevelEndingScreen(levelNumber) {
+  const ending = levelEndingContent[levelNumber];
+  if (!ending) {
+    return;
+  }
+
+  currentEndingLevel = levelNumber;
+  levelCompleteTitle.textContent = ending.title;
+  levelCompleteText.innerHTML = ending.body;
+  levelCompleteImage.src = ending.imageSrc;
+  levelCompleteImage.alt = ending.imageAlt;
+  level2StartButton.textContent = ending.buttonText;
+
   inputPhase = "transition";
   isAngleLocked = true;
   isPowerLocked = true;
@@ -108,21 +180,66 @@ function initializeGameFlow() {
   logoArea.innerHTML = '<img src="img/charitywater2.webp" alt="Charity Water Logo">';
   
   // Set up splash screen click handler
-  splashScreen.addEventListener("click", transitionToStory);
+  splashScreen.addEventListener("click", () => {
+    unlockAudioFromInteraction();
+    transitionToStory();
+  });
 
   // Set up story start button
-  storyStartButton.addEventListener("click", transitionToGame);
+  storyStartButton.addEventListener("click", () => {
+    unlockAudioFromInteraction();
+    transitionToGame();
+  });
+
+  // Keep controls text in sync if viewport changes while story screen is open.
+  mobileViewportQuery.addEventListener("change", () => {
+    if (gameFlowState === "story") {
+      updateStoryInstruction();
+    }
+  });
 
   // Set up level completion button
-  level2StartButton.addEventListener("click", transitionToLevel2FromEnding);
+  level2StartButton.addEventListener("click", () => {
+    unlockAudioFromInteraction();
+    transitionToNextLevelFromEnding();
+  });
 
   // Set up reset button to return to story
   startButton.addEventListener("click", () => {
+    unlockAudioFromInteraction();
     if (gameFlowState === "playing") {
       resetToLevelOne();
       transitionToStory();
     }
   });
+
+  if (audioToggleButton) {
+    audioToggleButton.addEventListener("click", () => {
+      unlockAudioFromInteraction();
+      setMuted(!audioState.isMuted);
+    });
+  }
+
+  if (musicVolumeSlider) {
+    musicVolumeSlider.addEventListener("input", (event) => {
+      unlockAudioFromInteraction();
+      const sliderValue = Number(event.target.value);
+      audioState.musicVolume = clamp(sliderValue / 100, 0, 1);
+      applyAudioMix();
+    });
+  }
+
+  if (sfxVolumeSlider) {
+    sfxVolumeSlider.addEventListener("input", (event) => {
+      unlockAudioFromInteraction();
+      const sliderValue = Number(event.target.value);
+      audioState.sfxVolume = clamp(sliderValue / 100, 0, 1);
+      applyAudioMix();
+      playTone(520, 0.08, 0.08, { type: "triangle" });
+    });
+  }
+
+  updateAudioControlUI();
 
   // Show splash screen initially
   showScreen("splash");
@@ -162,6 +279,7 @@ let totalGallons = 0;
 let currentGoalGallons = 50;
 let currentSplashMaxRadius = 40;
 let currentSplashGrowthRate = 130;
+let currentGallonsImpactMultiplier = 1;
 let baseRotationSpeed = 1.5;
 let basePowerSpeed = 0.9;
 let speedVariancePercentMin = 0.05;
@@ -237,6 +355,7 @@ const levelTargetImages = {
 };
 
 const worldMapBackgroundImage = createTargetImage("img/worldmap.jpeg");
+const finalPageWaterImage = createTargetImage("img/finalpagewater.jpeg");
 
 const levelTargetLabels = {
   1: ["Sinduhli District"],
@@ -278,6 +397,41 @@ let winLinkBounds = {
   height: 0,
 };
 
+const audioState = {
+  context: null,
+  masterGain: null,
+  musicGain: null,
+  sfxGain: null,
+  musicElement: null,
+  musicElementSource: null,
+  isMuted: false,
+  userUnlocked: false,
+  hasPlayedWinSound: false,
+  musicVolume: 0.24,
+  sfxVolume: 0.85,
+  loopTimer: null,
+  useGeneratedMusicFallback: false,
+  patternStep: 0,
+  pattern: [
+    { frequency: 196, duration: 0.5 },
+    { frequency: 220, duration: 0.45 },
+    { frequency: 246.94, duration: 0.5 },
+    { frequency: null, duration: 0.38 },
+    { frequency: 261.63, duration: 0.45 },
+    { frequency: 246.94, duration: 0.42 },
+    { frequency: 220, duration: 0.48 },
+    { frequency: null, duration: 0.34 },
+  ],
+};
+
+let comboStreakCount = 0;
+let comboText = {
+  isActive: false,
+  timer: 0,
+  duration: 1.15,
+  message: "",
+};
+
 function drawImageContain(image, boxX, boxY, boxWidth, boxHeight) {
   const imageWidth = image.naturalWidth;
   const imageHeight = image.naturalHeight;
@@ -302,6 +456,292 @@ function drawImageContain(image, boxX, boxY, boxWidth, boxHeight) {
   const drawY = boxY + (boxHeight - drawHeight) / 2;
 
   context.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+}
+
+function initAudioSystem() {
+  if (audioState.context) {
+    return true;
+  }
+
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) {
+    return false;
+  }
+
+  const audioContext = new AudioContextClass();
+  const masterGain = audioContext.createGain();
+  const musicGain = audioContext.createGain();
+  const sfxGain = audioContext.createGain();
+
+  musicGain.connect(masterGain);
+  sfxGain.connect(masterGain);
+  masterGain.connect(audioContext.destination);
+
+  audioState.context = audioContext;
+  audioState.masterGain = masterGain;
+  audioState.musicGain = musicGain;
+  audioState.sfxGain = sfxGain;
+
+  try {
+    const backgroundTrack = new Audio("songWater.wav");
+    backgroundTrack.loop = true;
+    backgroundTrack.preload = "auto";
+    const musicElementSource = audioContext.createMediaElementSource(backgroundTrack);
+    musicElementSource.connect(musicGain);
+    audioState.musicElement = backgroundTrack;
+    audioState.musicElementSource = musicElementSource;
+  } catch (_error) {
+    audioState.musicElement = null;
+    audioState.musicElementSource = null;
+  }
+
+  applyAudioMix();
+  return true;
+}
+
+function applyAudioMix() {
+  if (!audioState.context) {
+    return;
+  }
+
+  const masterLevel = audioState.isMuted ? 0 : 1;
+  audioState.masterGain.gain.setValueAtTime(masterLevel, audioState.context.currentTime);
+  audioState.musicGain.gain.setValueAtTime(audioState.musicVolume, audioState.context.currentTime);
+  audioState.sfxGain.gain.setValueAtTime(audioState.sfxVolume, audioState.context.currentTime);
+
+  if (audioState.musicElement) {
+    audioState.musicElement.muted = audioState.isMuted;
+  }
+}
+
+function updateAudioControlUI() {
+  if (audioToggleButton) {
+    audioToggleButton.textContent = audioState.isMuted ? "Sound: Off" : "Sound: On";
+    audioToggleButton.setAttribute("aria-pressed", audioState.isMuted ? "true" : "false");
+  }
+
+  if (musicVolumeSlider) {
+    musicVolumeSlider.value = String(Math.round(audioState.musicVolume * 100));
+  }
+
+  if (sfxVolumeSlider) {
+    sfxVolumeSlider.value = String(Math.round(audioState.sfxVolume * 100));
+  }
+}
+
+function unlockAudioFromInteraction() {
+  if (!initAudioSystem()) {
+    return;
+  }
+
+  if (audioState.context.state === "suspended") {
+    audioState.context.resume();
+  }
+
+  audioState.userUnlocked = true;
+  syncMusicForScreen();
+}
+
+function setMuted(nextMuted) {
+  audioState.isMuted = nextMuted;
+  applyAudioMix();
+  updateAudioControlUI();
+  syncMusicForScreen();
+}
+
+function syncMusicForScreen() {
+  if (!audioState.userUnlocked || !audioState.context) {
+    return;
+  }
+
+  if (gameFlowState === "playing" && !audioState.isMuted) {
+    startMusicLoop();
+    return;
+  }
+
+  stopMusicLoop();
+}
+
+function playTone(frequency, duration, volume, options = {}) {
+  if (!audioState.userUnlocked || !audioState.context || audioState.isMuted) {
+    return;
+  }
+
+  const type = options.type || "sine";
+  const attack = options.attack || 0.01;
+  const decay = options.decay || 0.04;
+  const delay = options.delay || 0;
+  const targetFrequency = options.targetFrequency || null;
+
+  const startTime = audioState.context.currentTime + delay;
+  const stopTime = startTime + duration;
+  const oscillator = audioState.context.createOscillator();
+  const gainNode = audioState.context.createGain();
+
+  oscillator.type = type;
+  oscillator.frequency.setValueAtTime(frequency, startTime);
+  if (targetFrequency !== null) {
+    oscillator.frequency.exponentialRampToValueAtTime(
+      Math.max(1, targetFrequency),
+      stopTime
+    );
+  }
+
+  gainNode.gain.setValueAtTime(0.0001, startTime);
+  gainNode.gain.exponentialRampToValueAtTime(Math.max(0.0002, volume), startTime + attack);
+  gainNode.gain.exponentialRampToValueAtTime(0.0001, stopTime - decay);
+
+  oscillator.connect(gainNode);
+  gainNode.connect(audioState.sfxGain);
+  oscillator.start(startTime);
+  oscillator.stop(stopTime);
+}
+
+function playHitSound() {
+  playTone(660, 0.16, 0.18, { type: "triangle", targetFrequency: 760 });
+  playTone(920, 0.12, 0.12, { type: "sine", delay: 0.055 });
+}
+
+function playMissSound() {
+  playTone(160, 0.24, 0.16, { type: "sawtooth", targetFrequency: 90 });
+}
+
+function playWinSound() {
+  playTone(523.25, 0.26, 0.15, { type: "triangle" });
+  playTone(659.25, 0.28, 0.13, { type: "triangle", delay: 0.09 });
+  playTone(783.99, 0.35, 0.14, { type: "triangle", delay: 0.18 });
+}
+
+function playThrowSound() {
+  playTone(390, 0.08, 0.07, { type: "square", targetFrequency: 300 });
+}
+
+function scheduleMusicNote(frequency, duration, when) {
+  if (!audioState.context || frequency === null) {
+    return;
+  }
+
+  const oscillator = audioState.context.createOscillator();
+  const gainNode = audioState.context.createGain();
+  oscillator.type = "sine";
+  oscillator.frequency.setValueAtTime(frequency, when);
+  gainNode.gain.setValueAtTime(0.0001, when);
+  gainNode.gain.exponentialRampToValueAtTime(0.045, when + 0.06);
+  gainNode.gain.exponentialRampToValueAtTime(0.0001, when + duration);
+  oscillator.connect(gainNode);
+  gainNode.connect(audioState.musicGain);
+  oscillator.start(when);
+  oscillator.stop(when + duration + 0.03);
+}
+
+function startGeneratedMusicLoop() {
+  if (audioState.loopTimer || !audioState.context) {
+    return;
+  }
+
+  const tickDurationMs = 640;
+  audioState.loopTimer = window.setInterval(() => {
+    const step = audioState.pattern[audioState.patternStep];
+    const now = audioState.context.currentTime + 0.02;
+    scheduleMusicNote(step.frequency, step.duration, now);
+    audioState.patternStep = (audioState.patternStep + 1) % audioState.pattern.length;
+  }, tickDurationMs);
+}
+
+function startMusicLoop() {
+  if (audioState.musicElement) {
+    audioState.useGeneratedMusicFallback = false;
+    audioState.musicElement.volume = 1;
+    const playPromise = audioState.musicElement.play();
+
+    if (playPromise && typeof playPromise.catch === "function") {
+      playPromise.catch(() => {
+        audioState.useGeneratedMusicFallback = true;
+        startGeneratedMusicLoop();
+      });
+    }
+
+    if (!audioState.useGeneratedMusicFallback) {
+      return;
+    }
+  }
+
+  startGeneratedMusicLoop();
+}
+
+function stopMusicLoop() {
+  if (audioState.musicElement) {
+    audioState.musicElement.pause();
+    audioState.musicElement.currentTime = 0;
+  }
+
+  if (audioState.loopTimer) {
+    window.clearInterval(audioState.loopTimer);
+    audioState.loopTimer = null;
+  }
+}
+
+function registerSuccessfulHit() {
+  comboStreakCount += 1;
+
+  if (comboStreakCount < 2) {
+    return;
+  }
+
+  comboText.isActive = true;
+  comboText.timer = 0;
+  comboText.message = `${comboStreakCount} Hit Streak!`;
+}
+
+function resetComboStreak() {
+  comboStreakCount = 0;
+  comboText.isActive = false;
+  comboText.timer = 0;
+  comboText.message = "";
+}
+
+function updateComboText(deltaTimeInSeconds) {
+  if (!comboText.isActive) {
+    return;
+  }
+
+  comboText.timer += deltaTimeInSeconds;
+  if (comboText.timer >= comboText.duration) {
+    comboText.isActive = false;
+    comboText.timer = 0;
+  }
+}
+
+function drawComboText() {
+  if (!comboText.isActive || !comboText.message) {
+    return;
+  }
+
+  const normalized = clamp(comboText.timer / comboText.duration, 0, 1);
+  const alpha = normalized < 0.8 ? 1 : (1 - normalized) / 0.2;
+  const textX = canvas.width - 130;
+  const textY = 38;
+
+  context.save();
+  context.globalAlpha = clamp(alpha, 0, 1);
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.font = '700 20px "Segoe UI", Tahoma, sans-serif';
+
+  const textWidth = context.measureText(comboText.message).width;
+  const paddingX = 12;
+  const paddingY = 8;
+  context.fillStyle = "rgba(23, 98, 64, 0.78)";
+  context.fillRect(
+    textX - textWidth / 2 - paddingX,
+    textY - 10 - paddingY,
+    textWidth + paddingX * 2,
+    22 + paddingY * 2
+  );
+
+  context.fillStyle = "#ffffff";
+  context.fillText(comboText.message, textX, textY);
+  context.restore();
 }
 
 function setRotationSpeed(speedInRadiansPerSecond) {
@@ -369,6 +809,7 @@ function resetAttemptState() {
   queuedLevel = null;
   isLevelTransitioning = false;
   transitionTimer = 0;
+  audioState.hasPlayedWinSound = false;
 
   startButton.classList.remove("is-hidden");
 
@@ -381,6 +822,11 @@ function showWinScreen() {
   isAngleLocked = true;
   isPowerLocked = true;
   droplet.isActive = false;
+
+  if (!audioState.hasPlayedWinSound) {
+    playWinSound();
+    audioState.hasPlayedWinSound = true;
+  }
 
   startButton.classList.remove("is-hidden");
 }
@@ -427,6 +873,8 @@ function startImpactText(levelNumber) {
 function startMissText() {
   missText.isActive = true;
   missText.timer = 0;
+  resetComboStreak();
+  playMissSound();
 }
 
 function updateImpactText(deltaTimeInSeconds) {
@@ -599,7 +1047,7 @@ function drawWinScreen() {
   context.fillRect(0, 0, canvas.width, canvas.height);
 
   const panelWidth = 620;
-  const panelHeight = 250;
+  const panelHeight = 370;
   const panelX = (canvas.width - panelWidth) / 2;
   const panelY = (canvas.height - panelHeight) / 2;
   const panelCenterX = canvas.width / 2;
@@ -626,6 +1074,17 @@ function drawWinScreen() {
   context.fillText("Its not an easy task getting water to the world", panelCenterX, panelY + 110);
   context.fillText("we need your help", panelCenterX, panelY + 140);
 
+  const imageWidth = 500;
+  const imageHeight = 140;
+  const imageX = panelCenterX - imageWidth / 2;
+  const imageY = panelY + 162;
+  context.fillStyle = "rgba(10, 40, 62, 0.08)";
+  context.fillRect(imageX, imageY, imageWidth, imageHeight);
+
+  if (finalPageWaterImage.complete && finalPageWaterImage.naturalWidth > 0) {
+    drawImageContain(finalPageWaterImage, imageX, imageY, imageWidth, imageHeight);
+  }
+
   const linkText = "find out how you can help";
   context.font = '700 20px "Segoe UI", Tahoma, sans-serif';
   context.fillStyle = "#0b66a1";
@@ -647,7 +1106,7 @@ function drawWinScreen() {
 
   context.fillStyle = "#4a6b80";
   context.font = '500 14px "Segoe UI", Tahoma, sans-serif';
-  context.fillText("Click outside this box to keep playing", panelCenterX, panelY + panelHeight - 14);
+  context.fillText("Click outside this box to return to the home screen", panelCenterX, panelY + panelHeight - 14);
   context.restore();
 }
 
@@ -675,12 +1134,13 @@ function handleWinOverlayPointer(event) {
   const pointer = getCanvasPointerPosition(event);
 
   if (pointInRect(pointer.x, pointer.y, winLinkBounds)) {
-    window.open("https://www.charitywater.org/", "_blank", "noopener,noreferrer");
+    window.open("https://www.charitywater.org", "_blank", "noopener,noreferrer");
     return;
   }
 
   if (!pointInRect(pointer.x, pointer.y, winPanelBounds)) {
-    resetAttemptState();
+    resetToLevelOne();
+    showScreen("splash");
   }
 }
 
@@ -726,8 +1186,14 @@ function applyAttemptVariance() {
 }
 
 function randomizeTargetPosition() {
-  targetArea.x = clamp(baseTargetX, 0, canvas.width - targetArea.width);
-  targetArea.y = clamp(baseTargetY, 0, canvas.height - targetArea.height);
+  const useRangeX = targetMaxX > targetMinX;
+  const useRangeY = targetMaxY > targetMinY;
+
+  const nextX = useRangeX ? randomRange(targetMinX, targetMaxX) : baseTargetX;
+  const nextY = useRangeY ? randomRange(targetMinY, targetMaxY) : baseTargetY;
+
+  targetArea.x = clamp(nextX, 0, canvas.width - targetArea.width);
+  targetArea.y = clamp(nextY, 0, canvas.height - targetArea.height);
 }
 
 function loadLevel(levelNumber) {
@@ -738,7 +1204,9 @@ function loadLevel(levelNumber) {
   targetImage = levelTargetImages[levelNumber] || null;
   targetLabelLines = levelTargetLabels[levelNumber] || [];
   currentGoalGallons = levelGoalGallons[levelNumber] || 50;
+  currentGallonsImpactMultiplier = 1;
   levelGallons = 0;
+  resetComboStreak();
 
   if (levelNumber === 1) {
     // Level 1: close/easy setup with smaller single-house target and forgiving timing.
@@ -787,17 +1255,18 @@ function loadLevel(levelNumber) {
   }
 
   if (levelNumber === 3) {
-    // Level 3: larger world target at top-center with fast timing and tight windows.
+    // Level 3: same world target image, much smaller, and relocates to new map regions.
     cameraZoom = 1;
     targetIconStyle = "globe";
-    targetArea.width = 520;
-    targetArea.height = 300;
+    targetArea.width = 150;
+    targetArea.height = 90;
     baseTargetX = canvas.width / 2 - targetArea.width / 2;
-    baseTargetY = canvas.height * 0.03;
+    baseTargetY = canvas.height * 0.22;
     targetShiftRange = 0;
-    setTargetRandomBounds(baseTargetX, baseTargetX, baseTargetY, baseTargetY);
-    currentSplashMaxRadius = 520;
+    setTargetRandomBounds(24, canvas.width - targetArea.width - 24, 110, canvas.height * 0.62);
+    currentSplashMaxRadius = 420;
     currentSplashGrowthRate = 560;
+    currentGallonsImpactMultiplier = 12;
 
     perfectZoneSize = 0.09;
     perfectZoneStart = 0.71;
@@ -885,23 +1354,35 @@ function processSplashScore() {
     return;
   }
 
-  const gallonsFromThisHit = calculateTargetPixelsInsideCircle(
+  const rawGallonsFromThisHit = calculateTargetPixelsInsideCircle(
     splash.x,
     splash.y,
     splash.maxRadius
   );
+  const gallonsFromThisHit = Math.round(rawGallonsFromThisHit * currentGallonsImpactMultiplier);
 
   splash.gallonsAwarded = gallonsFromThisHit;
   splash.hasScored = true;
   levelGallons += gallonsFromThisHit;
   totalGallons += gallonsFromThisHit;
+  playHitSound();
+  registerSuccessfulHit();
+
+  if (currentLevel === 3 && gallonsFromThisHit > 0 && levelGallons < currentGoalGallons) {
+    randomizeTargetPosition();
+  }
 
   if (levelGallons < currentGoalGallons) {
     return;
   }
 
   if (currentLevel === 1) {
-    showLevelOneEndingScreen();
+    showLevelEndingScreen(1);
+    return;
+  }
+
+  if (currentLevel === 2) {
+    showLevelEndingScreen(2);
     return;
   }
 
@@ -1306,6 +1787,7 @@ function gameLoop(timestamp) {
   updateLevelTransition(deltaTimeInSeconds);
   updateImpactText(deltaTimeInSeconds);
   updateMissText(deltaTimeInSeconds);
+  updateComboText(deltaTimeInSeconds);
   updateConfetti(deltaTimeInSeconds);
   updateArrow(deltaTimeInSeconds);
   updatePower(deltaTimeInSeconds);
@@ -1330,6 +1812,7 @@ function gameLoop(timestamp) {
   drawScoreHud();
   drawConfetti();
   drawImpactText();
+  drawComboText();
   drawMissText();
   drawWinScreen();
 
@@ -1337,6 +1820,8 @@ function gameLoop(timestamp) {
 }
 
 function handlePrimaryAction() {
+  unlockAudioFromInteraction();
+
   if (gameFlowState !== "playing") {
     return;
   }
@@ -1354,6 +1839,7 @@ function handlePrimaryAction() {
   if (inputPhase === "power") {
     lockPower();
     inputPhase = "thrown";
+    playThrowSound();
     throwWater(arrowAngle, powerValue);
     return;
   }
