@@ -3,6 +3,131 @@ const context = canvas.getContext("2d");
 const startButton = document.getElementById("startButton");
 const mobileViewportQuery = window.matchMedia("(max-width: 768px)");
 
+// Screen management
+const splashScreen = document.getElementById("splashScreen");
+const storyScreen = document.getElementById("storyScreen");
+const levelCompleteScreen = document.getElementById("levelCompleteScreen");
+const gameScreen = document.getElementById("gameScreen");
+const logoArea = document.getElementById("logoArea");
+const storyTitle = document.getElementById("storyTitle");
+const storyText = document.getElementById("storyText");
+const storyStartButton = document.getElementById("storyStartButton");
+const level2StartButton = document.getElementById("level2StartButton");
+
+// Debug: Check if elements are found
+console.log("✓ Charity Water Game loaded");
+
+// Game flow state
+let gameFlowState = "splash"; // splash, story, level-complete, playing
+
+// Story content by level
+const storyContent = {
+  1: {
+    title: `Between Heaven and Earth`,
+    body: `<p>In the Sindhuli District of rural Nepal, Shree Secondary School serves nearby mountain communities.</p>
+    <p>The school supports 527 students from Kindergarten through 12th grade, making it a critical center for learning in the area.</p>
+    <p>But many families still depend on unsafe rivers and ponds for drinking, cooking, and bathing. Dirty water is making children sick and keeping them out of school.</p>
+    <p>There is a plan to provide a reliable clean water source for the school and surrounding community.</p>
+    <br>
+    <p><strong>Your goal in this level is to help make that plan possible.</strong></p>`
+  },
+  2: {
+    title: `One of the Harshest Places on Earth`,
+    body: `<p>As a landlocked country in the Sahel region of West Africa, Mali faces relentless heat and long seasons of drought.</p>
+    <p>For families without clean water access, daily life means relying on centuries-old holes in the ground outside their village - unsafe sources shared by multiple communities.</p>
+    <p>Women often wait in line for hours each day just to collect water for their families.</p>
+    <br>
+    <p><strong>Help us bring clean water to these communities.</strong></p>`
+  },
+  3: {
+    title: `Global Change`,
+    body: `<p>We're now working across regions to bring clean water to millions.</p>
+    <p>Every action matters. Every gallon counts. Together, we can ensure that clean water reaches everyone who needs it.</p>
+    <p>Let's achieve our biggest goal yet!</p>`
+  }
+};
+
+// Screen transition functions
+function showScreen(screenName) {
+  splashScreen.classList.add("is-hidden");
+  storyScreen.classList.add("is-hidden");
+  levelCompleteScreen.classList.add("is-hidden");
+  gameScreen.classList.add("is-hidden");
+
+  if (screenName === "splash") {
+    splashScreen.classList.remove("is-hidden");
+    gameFlowState = "splash";
+    console.log("✓ Splash screen shown");
+  } else if (screenName === "story") {
+    storyScreen.classList.remove("is-hidden");
+    gameFlowState = "story";
+    console.log("✓ Story screen shown");
+  } else if (screenName === "level-complete") {
+    levelCompleteScreen.classList.remove("is-hidden");
+    gameFlowState = "level-complete";
+    console.log("✓ Level complete screen shown");
+  } else if (screenName === "game") {
+    gameScreen.classList.remove("is-hidden");
+    gameFlowState = "playing";
+    console.log("✓ Game screen shown");
+  }
+}
+
+function transitionToStory() {
+  const story = storyContent[currentLevel];
+  if (story) {
+    storyTitle.textContent = story.title;
+    storyText.innerHTML = story.body;
+    storyStartButton.textContent = `Start Level ${currentLevel}`;
+    showScreen("story");
+  }
+}
+
+function transitionToGame() {
+  showScreen("game");
+  loadLevel(currentLevel);
+  resetAttemptState();
+}
+
+function transitionToLevel2FromEnding() {
+  currentLevel = 2;
+  transitionToStory();
+}
+
+function showLevelOneEndingScreen() {
+  inputPhase = "transition";
+  isAngleLocked = true;
+  isPowerLocked = true;
+  droplet.isActive = false;
+  splash.isActive = false;
+  showScreen("level-complete");
+}
+
+function initializeGameFlow() {
+  // Set up splash screen logo
+  logoArea.innerHTML = '<img src="img/charitywater2.webp" alt="Charity Water Logo">';
+  
+  // Set up splash screen click handler
+  splashScreen.addEventListener("click", transitionToStory);
+
+  // Set up story start button
+  storyStartButton.addEventListener("click", transitionToGame);
+
+  // Set up level completion button
+  level2StartButton.addEventListener("click", transitionToLevel2FromEnding);
+
+  // Set up reset button to return to story
+  startButton.addEventListener("click", () => {
+    if (gameFlowState === "playing") {
+      resetToLevelOne();
+      transitionToStory();
+    }
+  });
+
+  // Show splash screen initially
+  showScreen("splash");
+}
+
 const launcherX = canvas.width / 2;
 const launcherY = canvas.height - 110;
 const minAngle = (-60 * Math.PI) / 180;
@@ -89,14 +214,13 @@ let queuedLevel = null;
 let isGameWon = false;
 
 const impactMessages = {
-  1: "You helped a family get clean water today.",
   2: "You helped a whole town access clean water.",
   3: "Your action supports clean water for entire regions.",
 };
 
 const levelGoalGallons = {
-  1: 50,
-  2: 500,
+  1: 9000,
+  2: 9000,
   3: 5000000,
 };
 
@@ -112,9 +236,11 @@ const levelTargetImages = {
   3: createTargetImage("img/stick figures around.png"),
 };
 
+const worldMapBackgroundImage = createTargetImage("img/worldmap.jpeg");
+
 const levelTargetLabels = {
-  1: ["Xing family from Tibet"],
-  2: ["Casa Santana, Cuba", "Poor Drinking Water"],
+  1: ["Sinduhli District"],
+  2: ["Sahel region"],
   3: ["Give everyone in the world fresh drinking water"],
 };
 
@@ -600,11 +726,8 @@ function applyAttemptVariance() {
 }
 
 function randomizeTargetPosition() {
-  const labelBottomPadding = 84;
-  const safeMaxY = Math.max(targetMinY, Math.min(targetMaxY, canvas.height - targetArea.height - labelBottomPadding));
-
-  targetArea.x = randomRange(targetMinX, targetMaxX);
-  targetArea.y = randomRange(targetMinY, safeMaxY);
+  targetArea.x = clamp(baseTargetX, 0, canvas.width - targetArea.width);
+  targetArea.y = clamp(baseTargetY, 0, canvas.height - targetArea.height);
 }
 
 function loadLevel(levelNumber) {
@@ -623,10 +746,10 @@ function loadLevel(levelNumber) {
     targetIconStyle = "bucket";
     targetArea.width = 48;
     targetArea.height = 48;
-    baseTargetX = canvas.width * 0.62;
-    baseTargetY = canvas.height * 0.43;
+    baseTargetX = canvas.width * 0.82 - 100;
+    baseTargetY = canvas.height * 0.15;
     targetShiftRange = 3;
-    setTargetRandomBounds(canvas.width * 0.28, canvas.width * 0.72, canvas.height * 0.14, canvas.height * 0.50);
+    setTargetRandomBounds(canvas.width * 0.79 - 100, canvas.width * 0.84 - 100, canvas.height * 0.12, canvas.height * 0.20);
     currentSplashMaxRadius = 55;
     currentSplashGrowthRate = 165;
 
@@ -646,10 +769,10 @@ function loadLevel(levelNumber) {
     targetIconStyle = "town";
     targetArea.width = 72;
     targetArea.height = 50;
-    baseTargetX = canvas.width * 0.67;
-    baseTargetY = canvas.height * 0.30;
+    baseTargetX = canvas.width * 0.42;
+    baseTargetY = canvas.height * 0.34 - targetArea.height / 2;
     targetShiftRange = 10;
-    setTargetRandomBounds(canvas.width * 0.22, canvas.width * 0.78, canvas.height * 0.10, canvas.height * 0.48);
+    setTargetRandomBounds(baseTargetX, baseTargetX, baseTargetY, baseTargetY);
     currentSplashMaxRadius = 95;
     currentSplashGrowthRate = 210;
 
@@ -777,6 +900,11 @@ function processSplashScore() {
     return;
   }
 
+  if (currentLevel === 1) {
+    showLevelOneEndingScreen();
+    return;
+  }
+
   startImpactText(currentLevel);
 
   if (currentLevel < maxLevel) {
@@ -788,6 +916,12 @@ function processSplashScore() {
 
 function drawBackground() {
   context.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (worldMapBackgroundImage.complete && worldMapBackgroundImage.naturalWidth > 0) {
+    context.drawImage(worldMapBackgroundImage, 0, 0, canvas.width, canvas.height);
+    return;
+  }
+
   context.fillStyle = "#dff0ff";
   context.fillRect(0, 0, canvas.width, canvas.height);
 }
@@ -1202,15 +1336,11 @@ function gameLoop(timestamp) {
   requestAnimationFrame(gameLoop);
 }
 
-startButton.addEventListener("click", () => {
-  if (isLevelTransitioning) {
+function handlePrimaryAction() {
+  if (gameFlowState !== "playing") {
     return;
   }
 
-  resetToLevelOne();
-});
-
-function handlePrimaryAction() {
   if (isGameWon || isLevelTransitioning) {
     return;
   }
@@ -1261,6 +1391,8 @@ canvas.addEventListener("pointerdown", (event) => {
   handlePrimaryAction();
 });
 
+// Initialize game flow and start animation loop
+currentLevel = 1;
+initializeGameFlow();
 loadLevel(1);
-resetAttemptState();
 requestAnimationFrame(gameLoop);

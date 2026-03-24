@@ -7,10 +7,51 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <main class="game-shell">
-      <canvas id="gameCanvas" width="960" height="540" aria-label="Game canvas"></canvas>
-      <div class="controls">
-        <button id="startButton" type="button">Reset To Level 1</button>
+    <!-- Splash Screen -->
+    <div id="splashScreen" class="screen splash-screen">
+      <div class="splash-content">
+        <div class="logo-area" id="logoArea">
+          <!-- Logo will go here -->
+        </div>
+        <p class="splash-prompt">Click anywhere to continue</p>
+      </div>
+    </div>
+
+    <!-- Story/Intro Screen -->
+    <div id="storyScreen" class="screen story-screen is-hidden">
+      <div class="story-content">
+        <h1 id="storyTitle" class="story-title"></h1>
+        <div id="storyText" class="story-text"></div>
+        <button id="storyStartButton" type="button" class="story-button">Start Level 1</button>
+      </div>
+    </div>
+
+    <!-- Level Complete Screen -->
+    <div id="levelCompleteScreen" class="screen story-screen is-hidden">
+      <div class="story-content">
+        <h1 id="levelCompleteTitle" class="story-title">A Healthier Future Begins</h1>
+        <div id="levelCompleteText" class="story-text">
+          <p>Families now have clean water close to home instead of climbing long distances to unsafe sources.</p>
+          <p>With safe water access, community health improved dramatically. The local clinic dropped from around 700 patients per month to about 60-65, and reported diarrhea cases fell from more than 6,000 per year to under 200.</p>
+          <p>Students now dream bigger: becoming scientists, doctors, engineers, teachers, and social workers to build a stronger future for their families and community.</p>
+        </div>
+        <img
+          id="levelCompleteImage"
+          src="img/watertibet.png"
+          alt="Students and community with improved water access"
+          class="story-ending-image"
+        >
+        <button id="level2StartButton" type="button" class="story-button">Start Level 2</button>
+      </div>
+    </div>
+
+    <!-- Main Game Screen -->
+    <main class="screen is-hidden" id="gameScreen">
+      <div class="game-shell">
+        <canvas id="gameCanvas" width="960" height="540" aria-label="Game canvas"></canvas>
+        <div class="controls">
+          <button id="startButton" type="button">Reset To Level 1</button>
+        </div>
       </div>
     </main>
 
